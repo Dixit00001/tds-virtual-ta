@@ -7,3 +7,4 @@ openai
 sentence-transformers
 scikit-learn
 faiss-cpu
+pytesseract
