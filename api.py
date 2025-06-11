@@ -1,22 +1,19 @@
-from fastapi import FastAPI, UploadFile, File
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional
+import base64
+import io
 import json
 import pytesseract
 from PIL import Image
-import base64
-import io
-import faiss
-from sentence_transformers import SentenceTransformer
-import numpy as np
 
 app = FastAPI()
 
-# ✅ Add CORS middleware for Render
+# ✅ CORS for Render
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -26,19 +23,23 @@ class Query(BaseModel):
     question: str
     image: Optional[str] = None
 
-# Load chunks and FAISS index
-with open("chunks.jsonl", "r", encoding="utf-8") as f:
-    chunks = [json.loads(line) for line in f]
-
-texts = [chunk["text"] for chunk in chunks]
-sources = [chunk.get("source", "") for chunk in chunks]
-ids = [chunk.get("id", "") for chunk in chunks]
-
-model = SentenceTransformer("all-MiniLM-L6-v2")
-index = faiss.read_index("index.faiss")
-
 @app.post("/api/")
 async def get_answer(query: Query):
+    import faiss
+    import numpy as np
+    from sentence_transformers import SentenceTransformer
+
+    # ✅ Lazy load everything to reduce memory on Render
+    with open("chunks.jsonl", "r", encoding="utf-8") as f:
+        chunks = [json.loads(line) for line in f]
+
+    texts = [chunk["text"] for chunk in chunks]
+    sources = [chunk.get("source", "") for chunk in chunks]
+    ids = [chunk.get("id", "") for chunk in chunks]
+
+    model = SentenceTransformer("all-MiniLM-L6-v2")
+    index = faiss.read_index("index.faiss")
+
     question = query.question
 
     if query.image:
@@ -61,6 +62,8 @@ async def get_answer(query: Query):
             for i, source in enumerate(selected_sources)
         ]
     }
+
+
 
   
   
