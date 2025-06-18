@@ -11,7 +11,7 @@ import pytesseract
 
 app = FastAPI()
 
-# CORS config
+# ✅ CORS middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -19,14 +19,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ✅ Root route to check files on server
 @app.get("/")
 def home():
     return {"files": os.listdir(".")}
 
+# ✅ Input format
 class Query(BaseModel):
     question: str
     image: Optional[str] = None
 
+# ✅ Main API logic
 @app.post("/api/")
 async def get_answer(query: Query):
     try:
@@ -34,25 +37,29 @@ async def get_answer(query: Query):
         import numpy as np
         from sentence_transformers import SentenceTransformer
 
-        # Try to load chunks
+        # Load chunked text data
         with open("chunks.jsonl", "r", encoding="utf-8") as f:
             chunks = [json.loads(line) for line in f]
 
         texts = [chunk["text"] for chunk in chunks]
         sources = [chunk.get("source", "") for chunk in chunks]
 
-        model = SentenceTransformer("all-MiniLM-L6-v2")
+        # Load FAISS index
         index = faiss.read_index("index.faiss")
+
+        # Load model
+        model = SentenceTransformer("all-MiniLM-L6-v2")
 
         question = query.question
 
-        # If image is given, extract text
+        # Optional image OCR
         if query.image:
             image_data = base64.b64decode(query.image)
             image = Image.open(io.BytesIO(image_data))
             extracted_text = pytesseract.image_to_string(image)
             question += " " + extracted_text.strip()
 
+        # Semantic search
         embedding = model.encode([question]).astype("float32")
         _, I = index.search(embedding, 3)
 
@@ -71,7 +78,7 @@ async def get_answer(query: Query):
         }
 
     except Exception as e:
-        # If anything fails, fallback gracefully
+        print("🔥 Internal error:", e)
         return {
             "answer": "(Fallback) I'm having trouble loading the data right now.",
             "links": [
@@ -82,3 +89,4 @@ async def get_answer(query: Query):
             ],
             "error": str(e)
         }
+
